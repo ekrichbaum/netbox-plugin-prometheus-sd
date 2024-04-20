@@ -21,6 +21,19 @@ class LabelDict(dict):
         }
 
 
+def extract_description(obj, labels: LabelDict):
+    """Extract description"""
+    if hasattr(obj, "description") and obj.description:
+        labels["description"] = obj.description
+
+
+def extract_location(obj, labels: LabelDict):
+    """Extract location"""
+    if hasattr(obj, "location") and obj.location:
+        labels["location"] = obj.location.name
+        labels["location_slug"] = obj.location.slug
+
+
 def extract_tags(obj, labels):
     if hasattr(obj, "tags") and obj.tags is not None and len(obj.tags.all()):
         labels["tags"] = ",".join([t.name for t in obj.tags.all()])
@@ -59,6 +72,11 @@ def extract_primary_ip(obj, labels: LabelDict):
 
     if getattr(obj, "primary_ip6", None) is not None:
         labels["primary_ip6"] = str(IPNetwork(obj.primary_ip6.address).ip)
+
+
+def extract_oob_ip(obj, labels: LabelDict):
+    if getattr(obj, "oob_ip", None) is not None:
+        labels["oob_ip"] = str(IPNetwork(obj.oob_ip.address).ip)
 
 
 def extracts_platform(obj, label: LabelDict):
@@ -124,6 +142,7 @@ def extract_prometheus_sd_config(obj, labels):
 def extract_parent(obj, labels: LabelDict):
     labels['parent'] = obj.parent.name
     extract_primary_ip(obj.parent, labels)
+    extract_oob_ip(obj.parent, labels)
     extract_tenant(obj.parent, labels)
     extract_cluster(obj.parent, labels)
     extract_contacts(obj.parent, labels)

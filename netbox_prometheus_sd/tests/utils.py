@@ -1,5 +1,5 @@
 from dcim.models.devices import DeviceType, Manufacturer
-from dcim.models.sites import Site
+from dcim.models.sites import Site, Location
 from dcim.models import Device, DeviceRole, Platform, Rack
 from extras.models import ConfigContext, Tag
 
@@ -20,6 +20,13 @@ def build_cluster():
         group=ClusterGroup.objects.get_or_create(name="VMware")[0],
         type=ClusterType.objects.get_or_create(name="On Prem")[0],
         site=Site.objects.get_or_create(name="Campus A", slug="campus-a")[0],
+    )[0]
+
+
+def build_location():
+    return Location.objects.get_or_create(
+        name="First Floor", slug="first-floor",
+        site=Site.objects.get_or_create(name="Site", slug="site")[0]
     )[0]
 
 
@@ -92,11 +99,9 @@ def build_vm_full(name):
 
 
 def build_minimal_device(name):
+    role_attr = "role" if hasattr(Device, "role") else "device_role"
     return Device.objects.get_or_create(
         name=name,
-        device_role=DeviceRole.objects.get_or_create(name="Firewall", slug="firewall")[
-            0
-        ],
         device_type=DeviceType.objects.get_or_create(
             model="SRX",
             slug="srx",
@@ -105,6 +110,9 @@ def build_minimal_device(name):
             )[0],
         )[0],
         site=Site.objects.get_or_create(name="Site", slug="site")[0],
+        **{
+            role_attr: DeviceRole.objects.get_or_create(name="Firewall", slug="firewall")[0],
+        }
     )[0]
 
 def build_device_config_context_no_array(name):
@@ -168,13 +176,16 @@ def build_device_config_context_mix_invalid_valid(name):
 
 def build_device_full(name):
     device = build_minimal_device(name)
+    device.location = build_location()
     device.tenant = build_tenant()
+    device.description = "Device Description"
     device.custom_field_data = build_custom_fields()
     device.platform = Platform.objects.get_or_create(name="Junos", slug="junos")[0]
     device.primary_ip4 = IPAddress.objects.get_or_create(address="192.168.0.1/24")[0]
     device.primary_ip6 = IPAddress.objects.get_or_create(address="2001:db8:1701::2/64")[
         0
     ]
+    device.oob_ip = IPAddress.objects.get_or_create(address="10.0.0.1/24")[0]
     device.rack = Rack.objects.get_or_create(
         name="R01B01", site=Site.objects.get_or_create(name="Site", slug="site")[0]
     )[0]

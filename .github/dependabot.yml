@@ -3,6 +3,24 @@ updates:
   - package-ecosystem: pip
     directory: "/"
     schedule:
-      interval: daily
-      time: "04:00"
-    open-pull-requests-limit: 10
+      interval: weekly
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: "scope"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: "scope"
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: "scope"

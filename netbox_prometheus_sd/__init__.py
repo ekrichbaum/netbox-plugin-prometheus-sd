@@ -1,5 +1,4 @@
-from extras.plugins import PluginConfig
-
+from netbox.plugins import PluginConfig
 
 class PrometheusSD(PluginConfig):
     name = "netbox_prometheus_sd"
@@ -13,6 +12,5 @@ class PrometheusSD(PluginConfig):
     base_url = "prometheus-sd"
     required_settings = []
     default_settings = {}
-
 
 config = PrometheusSD  # pylint:disable=invalid-name

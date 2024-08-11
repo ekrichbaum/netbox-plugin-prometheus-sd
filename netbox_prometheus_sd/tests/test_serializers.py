@@ -5,6 +5,7 @@ from ..api.serializers import (
     PrometheusIPAddressSerializer,
     PrometheusServiceSerializer,
     PrometheusVirtualMachineSerializer,
+    PrometheusInterfaceSerializer
 )
 from . import utils
 
@@ -352,3 +353,17 @@ class PrometheusServiceSerializerTests(TestCase):
             self.assertDictContainsSubset(
                 {"__meta_netbox_primary_ip6": "2001:db8:1701::2"}, data["labels"]
             )
+
+class PrometheusInterfaceSerializerTests(TestCase):
+    def test_ip_minimal_to_target(self):
+#        instance = utils.build_minimal_ip("10.10.10.10/24")
+#        data = PrometheusInterfaceSerializer(many=True, instance=[instance]).data[0]
+
+#        self.assertEqual(data["targets"], ["10.10.10.10"])
+#        self.assertDictContainsSubset({"__meta_netbox_id": str(instance.id)}, data["labels"])
+#        self.assertDictContainsSubset(
+#            {"__meta_netbox_status": "active"}, data["labels"]
+#        )
+#        self.assertDictContainsSubset(
+#            {"__meta_netbox_model": "IPAddress"}, data["labels"]
+#        )

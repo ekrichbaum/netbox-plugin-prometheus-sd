@@ -42,6 +42,9 @@ class ApiEndpointTests(TestCase):
         obj_perm.object_types.add(  # pylint: disable=no-member
             ObjectType.objects.get(app_label="virtualization", model="virtualmachine")
         )
+        obj_perm.object_types.add(  # pylint: disable=no-member
+            ObjectType.objects.get(app_label="dcim", model="interface")
+        )
         self.client.force_authenticate(user)
 
     def test_endpoint_device(self):
@@ -94,6 +97,20 @@ class ApiEndpointTests(TestCase):
             utils.build_vm_full(f"api-test-vm-{i}.example.com", i)
 
         resp = self.client.get("/api/plugins/prometheus-sd/services/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = json.loads(resp.content)
+
+        self.assertIsNotNone(data[0]["targets"])
+        self.assertIsNotNone(data[0]["labels"])
+        self.assertEqual(len(data), 60)
+
+    def test_endpoint_interface(self):
+        """Ensure service endpoint returns a valid response"""
+
+        for i in range(1, 61):
+            utils.build_vm_full(f"api-test-vm-{i}.example.com", i)
+
+        resp = self.client.get("/api/plugins/prometheus-sd/interfaces/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         data = json.loads(resp.content)
 

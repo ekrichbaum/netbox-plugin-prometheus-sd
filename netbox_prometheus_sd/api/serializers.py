@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.db import models
 from virtualization.models import VirtualMachine
-from dcim.models import Device
+from dcim.models import Device, Interface
 from ipam.models import IPAddress, Service
 
 from netaddr import IPNetwork
@@ -206,3 +206,41 @@ class PrometheusIPAddressSerializer(serializers.ModelSerializer):
         utils.extract_custom_fields(obj, labels)
 
         return labels.get_labels()
+
+class PrometheusInterfaceSerializer(serializers.ModelSerializer, PrometheusTargetsMixin):
+    """Serialize an interface to Prometheus target representation"""
+
+    class Meta:
+        model = Interface
+        fields = ["targets", "labels"]
+
+    targets = serializers.SerializerMethodField()
+    labels = serializers.SerializerMethodField()
+
+    def get_labels(self, obj):
+        firstip = ""
+        firstipmask = ""
+        if obj.count_ipaddresses > 0:
+            ipsplit = str(obj.ip_addresses.first()).split("/", 1)
+            firstip = ipsplit[0]
+            firstipmask = ipsplit[1]
+
+        labels = LabelDict(
+            {
+                "id": str(obj.id),
+                "devicename": str(obj.device.name),
+                "deviceid": str(obj.device.id),
+                "ip_address": firstip,
+                "ip_mask": firstipmask
+            }
+        )
+
+        utils.extract_tags(obj, labels)
+        utils.extract_custom_fields(obj, labels)
+
+        labels = labels.get_labels()
+
+        # Those shouldn't have the netbox prefix
+        utils.extract_prometheus_sd_config(obj, labels)
+
+        return labels

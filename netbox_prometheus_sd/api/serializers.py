@@ -220,16 +220,31 @@ class PrometheusInterfaceSerializer(serializers.ModelSerializer, PrometheusTarge
     def get_labels(self, obj):
         firstip = ""
         firstipmask = ""
+        cid = ""
+        circuit_desc = ""
+        provider = ""
         if obj.count_ipaddresses > 0:
             ipsplit = str(obj.ip_addresses.first()).split("/", 1)
             firstip = ipsplit[0]
             firstipmask = ipsplit[1]
+
+        # should always have link_peers but...
+        if hasattr(obj, "link_peers") and obj.link_peers is not None:
+            # may be device not circuit.
+            if len(obj.link_peers) > 0:
+                if hasattr(obj.link_peers[0], "circuit"):
+                    cid = obj.link_peers[0].circuit.cid
+                    circuit_desc = obj.link_peers[0].circuit.description
+                    provider=Provider.objects.filter(id=obj.link_peers[0].circuit.provider_id).first().name
 
         labels = LabelDict(
             {
                 "id": str(obj.id),
                 "devicename": str(obj.device.name),
                 "deviceid": str(obj.device.id),
+                "circuit_desc": circuit_desc,
+                "circuit_cid": cid,
+                "circuit_provider": provider,
                 "ip_address": firstip,
                 "ip_mask": firstipmask
             }

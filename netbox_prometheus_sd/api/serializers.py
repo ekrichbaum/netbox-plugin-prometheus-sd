@@ -3,6 +3,7 @@ from django.db import models
 from virtualization.models import VirtualMachine
 from dcim.models import Device, Interface
 from ipam.models import IPAddress, Service
+from tenancy.models import Tenant
 
 from netaddr import IPNetwork
 
@@ -223,6 +224,7 @@ class PrometheusInterfaceSerializer(serializers.ModelSerializer, PrometheusTarge
         cid = ""
         circuit_desc = ""
         provider = ""
+        tenant = ""
         if obj.count_ipaddresses > 0:
             ipsplit = str(obj.ip_addresses.first()).split("/", 1)
             firstip = ipsplit[0]
@@ -236,6 +238,10 @@ class PrometheusInterfaceSerializer(serializers.ModelSerializer, PrometheusTarge
                     cid = obj.link_peers[0].circuit.cid
                     circuit_desc = obj.link_peers[0].circuit.description
                     provider=Provider.objects.filter(id=obj.link_peers[0].circuit.provider_id).first().name
+                    # get Tenant from circuit or from device?
+                    tenant_obj =obj.link_peers[0].circuit.tenant
+                    if tenant_obj is not None:
+                        tenant = tenant_obj.name
 
         labels = LabelDict(
             {
@@ -245,6 +251,7 @@ class PrometheusInterfaceSerializer(serializers.ModelSerializer, PrometheusTarge
                 "circuit_desc": circuit_desc,
                 "circuit_cid": cid,
                 "circuit_provider": provider,
+                "tenant": tenant,
                 "ip_address": firstip,
                 "ip_mask": firstipmask
             }

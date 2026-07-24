@@ -24,7 +24,7 @@ jobs:
   commitlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: wagoid/commitlint-github-action@v6
 
   # Matrix build for Netbox versions
@@ -40,7 +40,7 @@ jobs:
           - v4.4.10
           - v4.5.2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -50,7 +50,7 @@ jobs:
           echo "Running with Docker Version: $(docker version)"
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
@@ -60,7 +60,7 @@ jobs:
           pip install poetry
 
       - name: Cache Poetry virtualenv
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: cache
         with:
           path: ~/.virtualenvs
@@ -78,3 +78,26 @@ jobs:
         env:
           NETBOX_VER: ${{ matrix.netbox-version }}
           DOCKER_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
+
+  # Single aggregated status check for branch protection to require.
+  #
+  # Requiring the matrix jobs directly would mean editing branch protection
+  # every time the Netbox version list changes, and a required check that no
+  # longer exists blocks every PR forever. Requiring only this job keeps that
+  # list free to change.
+  #
+  # `always()` is load-bearing: without it this job is skipped when anything it
+  # needs fails, the check never reports, and PRs wait on it indefinitely.
+  ci-ok:
+    if: always()
+    needs: [commitlint, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify that all jobs passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "commitlint: ${{ needs.commitlint.result }}"
+          echo "build:      ${{ needs.build.result }}"
+          exit 1
+      - name: All checks passed
+        run: echo "commitlint and the full Netbox matrix are green."

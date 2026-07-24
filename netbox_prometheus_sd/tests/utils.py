@@ -7,7 +7,13 @@ from dcim.models import Device, DeviceRole, Platform, Rack
 from extras.models import ConfigContext, Tag
 
 from ipam.models import IPAddress, Service
-from tenancy.models import Tenant, TenantGroup
+from tenancy.models import (
+    Contact,
+    ContactAssignment,
+    ContactRole,
+    Tenant,
+    TenantGroup,
+)
 
 from virtualization.models import (
     Cluster,
@@ -51,6 +57,18 @@ def build_location():
 
 def build_tenant():
     return Tenant.objects.get_or_create(name="Acme Corp.", slug="acme")[0]
+
+
+def build_contact_for(obj):
+    """Assign a contact to obj so extract_contacts() has something to render."""
+    contact = Contact.objects.get_or_create(
+        name="Jane Doe",
+        defaults={"email": "jane@example.com", "comments": "Primary on-call"},
+    )[0]
+    role = ContactRole.objects.get_or_create(name="On Call", slug="on-call")[0]
+    return ContactAssignment.objects.create(
+        object=obj, contact=contact, role=role, priority="primary"
+    )
 
 
 def build_custom_fields():
@@ -114,15 +132,29 @@ def build_vm_full(name, ip_octet=1):
     vm.tags.add("Tag 2")
     vm.save()
 
-    try: # NetBox 4.2+
-        Service.objects.create(parent=vm, name="ssh", protocol="tcp", ports=[22])
-    except AttributeError: # NetBox <4.2
-        Service.objects.create(virtual_machine=vm, name="ssh", protocol="tcp", ports=[22])
+    build_contact_for(vm)
+    build_service_for(vm, name="ssh", protocol="tcp", ports=[22])
     return vm
 
 
+def build_service_for(parent, **kwargs):
+    """Create a service bound to parent, with the parent's primary IPv4 attached.
+
+    Netbox 4.3 replaced Service.device/Service.virtual_machine with a single
+    generic `parent` relation, which is read-only on older releases.
+    """
+    try: # NetBox 4.3+
+        service = Service.objects.create(parent=parent, **kwargs)
+    except AttributeError: # NetBox <4.3
+        field = "device" if isinstance(parent, Device) else "virtual_machine"
+        service = Service.objects.create(**{field: parent}, **kwargs)
+
+    if parent.primary_ip4 is not None:
+        service.ipaddresses.set([parent.primary_ip4])
+    return service
+
+
 def build_minimal_device(name):
-    role_attr = "role" if hasattr(Device, "role") else "device_role"
     return Device.objects.get_or_create(
         name=name,
         device_type=DeviceType.objects.get_or_create(
@@ -133,11 +165,7 @@ def build_minimal_device(name):
             )[0],
         )[0],
         site=Site.objects.get_or_create(name="Site", slug="site")[0],
-        **{
-            role_attr: DeviceRole.objects.get_or_create(
-                name="Firewall", slug="firewall"
-            )[0],
-        },
+        role=DeviceRole.objects.get_or_create(name="Firewall", slug="firewall")[0],
     )[0]
 
 
@@ -225,17 +253,20 @@ def build_device_full(name, ip_octet=1):
     )[0]
     device.oob_ip = IPAddress.objects.get_or_create(address=f"10.0.0.{ip_octet}/24")[0]
     device.rack = Rack.objects.get_or_create(
-        name="R01B01", site=Site.objects.get_or_create(name="Site", slug="site")[0]
+        name="R01B01",
+        site=Site.objects.get_or_create(name="Site", slug="site")[0],
+        defaults={"u_height": 100},
     )[0]
     device.site = Site.objects.get_or_create(name="Site", slug="site")[0]
+    # Rack position is unique per (rack, position, face), so it has to follow
+    # ip_octet like the addresses do -- otherwise callers building more than one
+    # device hit an IntegrityError.
+    device.position = float(ip_octet)
     device.tags.add("Tag1")
     device.tags.add("Tag 2")
     device.save()
-    device.position = 1.0
-    try: # NetBox 4.2+
-        Service.objects.create(parent=device, name="ssh", protocol="tcp", ports=[22])
-    except AttributeError: # NetBox <4.2
-        Service.objects.create(device=device, name="ssh", protocol="tcp", ports=[22])
+    build_contact_for(device)
+    build_service_for(device, name="ssh", protocol="tcp", ports=[22])
     return device
 
 

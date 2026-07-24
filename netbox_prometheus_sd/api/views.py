@@ -2,7 +2,7 @@ from django.contrib.contenttypes.prefetch import GenericPrefetch
 
 from ipam.models import IPAddress, Service
 from virtualization.models import VirtualMachine
-from dcim.models.devices import Device
+from dcim.models.devices import Device, Interface
 
 from netbox.api.viewsets import BaseViewSet
 from netbox.api.viewsets.mixins import CustomFieldsMixin
@@ -11,7 +11,7 @@ from rest_framework.mixins import ListModelMixin
 from .utils import NETBOX_RELEASE_CURRENT, NETBOX_RELEASE_41
 
 from ipam.filtersets import IPAddressFilterSet
-from dcim.filtersets import DeviceFilterSet
+from dcim.filtersets import DeviceFilterSet, InterfaceFilterSet
 from virtualization.filtersets import VirtualMachineFilterSet
 
 from ..filtersets import ServiceFilterSet
@@ -20,6 +20,7 @@ from .serializers import (
     PrometheusDeviceSerializer,
     PrometheusVirtualMachineSerializer,
     PrometheusServiceSerializer,
+    PrometheusInterfaceSerializer,
 )
 
 
@@ -150,4 +151,18 @@ class IPAddressViewSet(NetboxPrometheusSDModelViewSet):
     queryset = IPAddress.objects.select_related("tenant__group").prefetch_related("tags")
     serializer_class = PrometheusIPAddressSerializer
     filterset_class = IPAddressFilterSet
+    pagination_class = None
+
+
+class InterfaceViewSet(NetboxPrometheusSDModelViewSet):  # pylint: disable=too-many-ancestors
+    queryset = Interface.objects.prefetch_related(
+        '_path', 'cable__terminations',
+        'l2vpn_terminations',  # Referenced by InterfaceSerializer.l2vpn_termination
+        'ip_addresses',  # Referenced by Interface.count_ipaddresses()
+        'fhrp_group_assignments',  # Referenced by Interface.count_fhrp_groups()
+        'device',
+        'tags',
+    )
+    filterset_class = InterfaceFilterSet
+    serializer_class = PrometheusInterfaceSerializer
     pagination_class = None

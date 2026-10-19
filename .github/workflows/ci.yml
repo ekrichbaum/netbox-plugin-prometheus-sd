@@ -27,6 +27,16 @@ jobs:
       - uses: actions/checkout@v7
       - uses: wagoid/commitlint-github-action@v6
 
+  # Static analysis of the workflow files themselves, including shellcheck over
+  # `run:` blocks. Worth having because CI never executes release.yaml or
+  # publish.yml -- a mistake in either only shows up when a release is cut.
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint workflow files
+        uses: docker://rhysd/actionlint:1.7.12
+
   # Matrix build for Netbox versions
   build:
     runs-on: ubuntu-latest
@@ -39,6 +49,8 @@ jobs:
           - v4.3.7
           - v4.4.10
           - v4.5.2
+          - v4.6.10
+          - v4.7.0
     steps:
       - uses: actions/checkout@v7
 
@@ -79,25 +91,25 @@ jobs:
           NETBOX_VER: ${{ matrix.netbox-version }}
           DOCKER_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
 
-  # Single aggregated status check for branch protection to require.
+  # Single aggregated pass/fail signal for the whole pipeline.
   #
-  # Requiring the matrix jobs directly would mean editing branch protection
-  # every time the Netbox version list changes, and a required check that no
-  # longer exists blocks every PR forever. Requiring only this job keeps that
-  # list free to change.
+  # `main` is unprotected -- nothing *requires* this check. It exists so a PR
+  # shows one line that says whether everything passed, instead of making you
+  # read a Netbox version matrix that changes over time.
   #
   # `always()` is load-bearing: without it this job is skipped when anything it
   # needs fails, the check never reports, and PRs wait on it indefinitely.
   ci-ok:
     if: always()
-    needs: [commitlint, build]
+    needs: [commitlint, actionlint, build]
     runs-on: ubuntu-latest
     steps:
       - name: Verify that all jobs passed
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: |
           echo "commitlint: ${{ needs.commitlint.result }}"
+          echo "actionlint: ${{ needs.actionlint.result }}"
           echo "build:      ${{ needs.build.result }}"
           exit 1
       - name: All checks passed
-        run: echo "commitlint and the full Netbox matrix are green."
+        run: echo "commitlint, actionlint and the full Netbox matrix are green."

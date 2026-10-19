@@ -67,8 +67,9 @@ GET        /api/plugins/prometheus-sd/interfaces/           Get a list of interf
 
 #### Extended services filters
 
-Apart from standard Netbox filters, services endpoint also supports `tenant=<slug>` or `tenant_id=<id>` parameters.
-The lookup is only executed against the `tenant` attribute of the object associated with the service.
+Apart from standard Netbox filters, services endpoint also supports `tenant=<slug>` or `tenant_id=<id>`, and
+`site=<slug>` or `site_id=<id>` parameters. The lookup is only executed against the `tenant`/`site` attribute of the
+object associated with the service.
 
 #### Filtering and response size
 

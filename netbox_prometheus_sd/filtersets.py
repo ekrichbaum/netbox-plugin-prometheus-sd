@@ -8,14 +8,19 @@ from utilities.filters import (
 )
 
 from ipam.filtersets import ServiceFilterSet as NetboxServiceFilterSet
+from ipam.models import Service
+
+# Netbox 4.7 replaced the Service.ports ArrayField with `port_mappings`, and
+# its filterset metaclass rejects a filter on a field that no longer exists.
+SERVICE_HAS_PORTS_FIELD = any(f.name == "ports" for f in Service._meta.get_fields())
 
 
 class ServiceFilterSet(NetboxServiceFilterSet):
-    """Filter set to support tenancy over the device/VM foreign key.
+    """Filter set to support tenancy and site filtering over the device/VM foreign key.
 
-    Tenancy in Netbox is very incosistent and the relationship on its own is defined across many different models. This
+    Tenancy in Netbox is very inconsistent and the relationship on its own is defined across many different models. This
     means that supporting all layers is nearly impossible without a stronger upstream support. For this reason only the
-    "first level" tenancy is supported by this filter set.
+    "first level" tenancy is supported by the tenant filter set.
     """
 
     tenant_id = MultiValueNumberFilter(
@@ -28,9 +33,21 @@ class ServiceFilterSet(NetboxServiceFilterSet):
         label=_("Tenant (slug)"),
     )
 
-    # fix to make the test_missing_filters pass
+    site_id = MultiValueNumberFilter(
+        method="filter_by_site_id",
+        label=_("Site (ID)"),
+    )
+
+    site = MultiValueCharFilter(
+        method="filter_by_site_slug",
+        label=_("Site (slug)"),
+    )
+
+    # Netbox < 4.7 only exposes the ports array as `port`, but Netbox's
+    # test_missing_filters wants a filter named after the model field.
     # see: https://github.com/netbox-community/netbox/blob/master/netbox/utilities/testing/filtersets.py#L98
-    ports = NumericArrayFilter(field_name="ports", lookup_expr="contains")
+    if SERVICE_HAS_PORTS_FIELD:
+        ports = NumericArrayFilter(field_name="ports", lookup_expr="contains")
 
     def filter_by_cluster_tenant_id(self, queryset, name, value):
         return queryset.filter(
@@ -53,4 +70,15 @@ class ServiceFilterSet(NetboxServiceFilterSet):
         return queryset.filter(
             Q(device__tenant__slug__in=value)
             | Q(virtual_machine__tenant__slug__in=value)
+        )
+
+    def filter_by_site_id(self, queryset, name, value):
+        return queryset.filter(
+            Q(device__site_id__in=value) | Q(virtual_machine__site_id__in=value)
+        )
+
+    def filter_by_site_slug(self, queryset, name, value):
+        return queryset.filter(
+            Q(device__site__slug__in=value)
+            | Q(virtual_machine__site__slug__in=value)
         )
